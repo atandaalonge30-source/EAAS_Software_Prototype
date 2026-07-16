@@ -28,9 +28,15 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "models")
 os.makedirs(MODEL_DIR, exist_ok=True)
 
-FACE_CASCADE = cv2.CascadeClassifier(
-    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+HAAR_CASCADE_PATH = os.path.join(
+    BASE_DIR, "data", "haarcascade_frontalface_default.xml"
 )
+if not os.path.exists(HAAR_CASCADE_PATH):
+    HAAR_CASCADE_PATH = os.path.join(
+        cv2.data.haarcascades, "haarcascade_frontalface_default.xml"
+    )
+
+FACE_CASCADE = cv2.CascadeClassifier(HAAR_CASCADE_PATH)
 
 IMG_SIZE = (160, 160)
 EMOTIONS = ["Neutral", "Happy", "Sad", "Angry", "Surprised"]
