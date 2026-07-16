@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="section-head"><div><h1>Model Status</h1><p>Face & Emotion model state and controls.</p></div></div>
+
+<div class="panel">
+  <div class="sub">Face recogniser: <strong>{{ 'Trained' if status.face_trained else 'Not trained' }}</strong></div>
+  <div class="sub">Label map size: <strong>{{ status.label_map_size }}</strong></div>
+  <div class="sub">Emotion classifier: <strong>{{ 'Trained' if status.emotion_trained else 'Not trained' }}</strong></div>
+  <form method="post" action="{{ url_for('retrain_model_route') }}">
+    <button class="btn btn-primary" type="submit">Retrain Models</button>
+  </form>
+</div>
+{% if label_map %}
+<div class="panel" style="margin-top:12px;">
+  <h3>Label Map</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Label</th><th>User ID</th></tr></thead>
+      <tbody>
+        {% for m in label_map %}
+        <tr><td>{{ m.label }}</td><td>{{ m.user_id }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="section-head">
+  <div><h1>Enrolled Users</h1><p>Report generated from the <code>users</code> table — Section 4.1.1(a)</p></div>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Photo</th><th>Full Name</th><th>Matric No.</th><th>Department</th>
+      <th>Baseline Emotion</th><th>Enrolled</th><th>Action</th>
+    </tr></thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td><img class="avatar-sm" src="{{ u.image_url }}"></td>
+        <td>{{ u.full_name }}</td>
+        <td style="font-family:var(--font-mono);">{{ u.matric_no }}</td>
+        <td>{{ u.department }}</td>
+        <td><span class="pill pill-success">{{ u.baseline_emotion }}</span></td>
+        <td style="font-family:var(--font-mono);font-size:12px;">{{ u.created_at }}</td>
+        <td style="display:flex;gap:8px;">
+          <a class="btn btn-ghost" href="{{ url_for('re_enrol', user_id=u.id) }}">Re-Enrol</a>
+          <form method="post" action="{{ url_for('delete_user_route', user_id=u.id) }}" class="confirm-delete" data-confirm="Delete this enrolled user and all related logs?">
+            <button class="btn btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

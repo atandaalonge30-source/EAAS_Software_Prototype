@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="section-head">
+  <div><h1>Access Log Report</h1><p>Report generated from the <code>access_logs</code> table — Section 4.1.1(a)</p></div>
+</div>
+
+<div class="stat-strip">
+  <div class="stat-box"><div class="n">{{ total }}</div><div class="l">Total Attempts</div></div>
+  <div class="stat-box"><div class="n">{{ granted }}</div><div class="l">Granted</div></div>
+  <div class="stat-box"><div class="n">{{ flagged }}</div><div class="l">Flagged for Extra Verification</div></div>
+  <div class="stat-box"><div class="n">{{ denied }}</div><div class="l">Denied</div></div>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Snapshot</th><th>Claimed / Matched User</th><th>Identity %</th>
+      <th>Emotion</th><th>Emotion %</th><th>Decision</th><th>Timestamp</th><th>Action</th>
+    </tr></thead>
+    <tbody>
+      {% for row in logs %}
+      <tr>
+        <td><img class="avatar-sm" src="{{ row.image_url }}"></td>
+        <td>{{ row.name }}</td>
+        <td>{{ row.identity_confidence }}%</td>
+        <td>{{ row.emotion_label }}</td>
+        <td>{{ row.emotion_confidence }}%</td>
+        <td><span class="pill pill-{{ row.level }}">{{ row.decision }}</span></td>
+        <td style="font-family:var(--font-mono);font-size:12px;">{{ row.created_at }}</td>
+        <td>
+          <form method="post" action="{{ url_for('delete_log', log_id=row.id) }}" class="confirm-delete" data-confirm="Delete this access log?">
+            <button class="btn btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

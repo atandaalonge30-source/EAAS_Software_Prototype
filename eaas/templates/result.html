@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel result-panel">
+  <div class="result-badge badge-{{ level }}">
+    {% if level=='success' %}&#10003;{% elif level=='warning' %}&#33;{% else %}&#10005;{% endif %}
+  </div>
+  <h1>{{ decision }}</h1>
+  <p class="reason">{{ reason }}</p>
+
+  <div class="metric-row">
+    <div class="metric"><div class="val">{{ identity_name }}</div><div class="lbl">Matched Identity</div></div>
+    <div class="metric"><div class="val">{{ identity_conf }}%</div><div class="lbl">Identity Similarity</div></div>
+    <div class="metric"><div class="val">{{ emotion_label }}</div><div class="lbl">Detected Emotion</div></div>
+    <div class="metric"><div class="val">{{ emotion_conf }}%</div><div class="lbl">Emotion Confidence</div></div>
+  </div>
+
+  <div class="scan-wrap" style="margin-bottom:28px;">
+    <div class="scan-frame" style="width:150px;height:150px;border-radius:14px;">
+      <img src="{{ image_url }}" alt="captured frame">
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <a class="btn btn-ghost" href="{{ url_for('login') }}">Scan Again</a>
+    <a class="btn btn-primary" href="{{ url_for('admin_logs') }}">View Access Log</a>
+  </div>
+</div>
+{% endblock %}

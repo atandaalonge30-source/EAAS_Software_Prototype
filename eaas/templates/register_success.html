@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel result-panel">
+  <div class="result-badge badge-success">&#10003;</div>
+  <h1>Enrolment Successful</h1>
+  <p class="reason">{{ full_name }} ({{ matric_no }}) has been added to the biometric database. The recognition and baseline emotion models have been retrained to include this profile.</p>
+  <div class="scan-wrap" style="margin-bottom:28px;">
+    <div class="scan-frame" style="width:150px;height:150px;border-radius:14px;">
+      <img src="{{ image_url }}" alt="enrolled photo">
+    </div>
+  </div>
+  <div class="btn-row">
+    <a class="btn btn-ghost" href="{{ url_for('register') }}">Enrol Another User</a>
+    <a class="btn btn-primary" href="{{ url_for('login') }}">Try Authentication</a>
+  </div>
+</div>
+{% endblock %}

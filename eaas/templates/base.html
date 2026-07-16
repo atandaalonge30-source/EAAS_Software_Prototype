@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Emotion-Aware Authentication System{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <nav class="topnav">
+    <a class="brand" href="{{ url_for('home') }}">
+      <span class="mark">EA</span>
+      <span>Emotion-Aware Authentication<small>LAUTECH &middot; Dept. of Computer Science</small></span>
+    </a>
+    <div class="navlinks">
+      <a href="{{ url_for('home') }}" class="{{ 'active' if active=='home' else '' }}">Home</a>
+      <a href="{{ url_for('register') }}" class="{{ 'active' if active=='register' else '' }}">Register</a>
+      <a href="{{ url_for('login') }}" class="{{ 'active' if active=='login' else '' }}">Login / Scan</a>
+      <a href="{{ url_for('admin_logs') }}" class="{{ 'active' if active=='logs' else '' }}">Access Logs</a>
+      <a href="{{ url_for('admin_users') }}" class="{{ 'active' if active=='users' else '' }}">Enrolled Users</a>
+      <a href="{{ url_for('admin_model') }}" class="{{ 'active' if active=='model' else '' }}">Models</a>
+    </div>
+  </nav>
+  <div class="page {{ 'narrow' if narrow else '' }}">
+    {% block content %}{% endblock %}
+    <div class="footer-note">EMOTION-AWARE AUTHENTICATION SYSTEM &nbsp;|&nbsp; Prototype Build &nbsp;|&nbsp; Local ML Engine: OpenCV LBPH + scikit-learn MLP</div>
+  </div>
+  <!-- Confirmation modal for destructive actions -->
+  <div id="confirm-modal" class="modal" style="display:none;position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;">
+    <div style="background:var(--navy-900);padding:18px;border-radius:10px;max-width:420px;width:90%;">
+      <h3 style="margin-top:0;">Confirm action</h3>
+      <p id="confirm-message">Are you sure?</p>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+        <button id="confirm-cancel" class="btn btn-ghost">Cancel</button>
+        <button id="confirm-ok" class="btn btn-danger">Delete</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    document.addEventListener('click', function(e){
+      // no-op to ensure DOM loaded
+    });
+    (function(){
+      function showModal(message, onConfirm){
+        const modal = document.getElementById('confirm-modal');
+        document.getElementById('confirm-message').innerText = message || 'Are you sure?';
+        modal.style.display = 'flex';
+        function cleanup(){ modal.style.display='none'; document.getElementById('confirm-ok').removeEventListener('click', ok); document.getElementById('confirm-cancel').removeEventListener('click', cancel); }
+        function ok(){ cleanup(); onConfirm(true); }
+        function cancel(){ cleanup(); onConfirm(false); }
+        document.getElementById('confirm-ok').addEventListener('click', ok);
+        document.getElementById('confirm-cancel').addEventListener('click', cancel);
+      }
+
+      // Intercept forms with class 'confirm-delete'
+      document.addEventListener('submit', function(ev){
+        const form = ev.target;
+        if (form && form.classList && form.classList.contains('confirm-delete')){
+          ev.preventDefault();
+          const msg = form.getAttribute('data-confirm') || 'Are you sure you want to delete this item?';
+          showModal(msg, function(ok){ if (ok) form.submit(); });
+        }
+      }, true);
+    })();
+  </script>
+</body>
+</html>

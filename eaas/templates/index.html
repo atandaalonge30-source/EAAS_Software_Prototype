@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="hero">
+  <span class="eyebrow"><span class="dot"></span> Dual-Factor Biometric Engine Online</span>
+  <h1>Access decisions that read<br>identity <em>and</em> emotion.</h1>
+  <p>A machine-learning authentication prototype that pairs facial identity verification (LBPH)
+     with real-time emotion-state analysis (ANN classifier) to flag coerced, spoofed or abnormal
+     login attempts that password and fingerprint systems miss.</p>
+  <div class="btn-row">
+    <a class="btn btn-primary" href="{{ url_for('register') }}">Enrol a New User</a>
+    <a class="btn btn-ghost" href="{{ url_for('login') }}">Authenticate / Scan</a>
+  </div>
+</div>
+
+<div class="grid3">
+  <div class="card">
+    <div class="icon-badge">1</div>
+    <h3>Facial Identification</h3>
+    <p>Haar-cascade face localisation feeds a Local Binary Pattern Histogram (LBPH) recognizer
+       trained per-user during enrolment, returning an identity-similarity score.</p>
+  </div>
+  <div class="card">
+    <div class="icon-badge">2</div>
+    <h3>Emotion Recognition</h3>
+    <p>Region-based facial feature extraction (brow / eye / mouth) is classified by a
+       scikit-learn artificial neural network into Neutral, Happy, Sad, Angry or Surprised.</p>
+  </div>
+  <div class="card">
+    <div class="icon-badge">3</div>
+    <h3>Fusion Decision Engine</h3>
+    <p>Identity and emotion scores are combined by a weighted decision unit that grants,
+       denies, or escalates a login to additional verification.</p>
+  </div>
+</div>
+
+<div class="stat-strip">
+  <div class="stat-box"><div class="n">{{ user_count }}</div><div class="l">Enrolled Users</div></div>
+  <div class="stat-box"><div class="n">{{ log_count }}</div><div class="l">Authentication Attempts Logged</div></div>
+  <div class="stat-box"><div class="n">{{ granted_pct }}%</div><div class="l">Attempts Granted</div></div>
+  <div class="stat-box"><div class="n">5</div><div class="l">Emotion Classes Modelled</div></div>
+</div>
+{% endblock %}

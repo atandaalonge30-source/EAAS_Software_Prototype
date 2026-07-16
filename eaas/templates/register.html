@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="section-head"><div><h1>User Enrolment</h1><p>Data capture screen for input — Section 4.1.2(b)</p></div></div>
+
+<div class="panel">
+  <h2>1. Biodata</h2>
+  <div class="sub">Fields marked required are stored in the <code>users</code> table (Section 4.1.4).</div>
+  <form id="reg-form">
+    <div class="two-col">
+      <div class="field"><label>Full Name</label><input type="text" id="full_name" required placeholder="e.g. Oyewunmi Demilade Peter"></div>
+      <div class="field"><label>Matric Number</label><input type="text" id="matric_no" required placeholder="e.g. 2021002681"></div>
+    </div>
+    <div class="two-col">
+      <div class="field"><label>Department</label><input type="text" id="department" placeholder="Computer Science"></div>
+      <div class="field"><label>Email</label><input type="email" id="email" placeholder="name@lautech.edu.ng"></div>
+    </div>
+  </form>
+</div>
+
+<div class="panel">
+  <h2>2. Facial &amp; Emotional Enrolment</h2>
+  <div class="sub">The system captures 5 frames to build a robust identity template and a baseline emotional profile, consistent with the multi-sample data collection procedure described in Section 1.6.2.</div>
+  <div class="scan-wrap">
+    <div class="scan-ring"><div class="scan-frame"><video id="video" autoplay muted playsinline></video></div></div>
+    <div class="scan-status" id="scan-status">Camera idle — press "Start Enrolment Scan"</div>
+  </div>
+    <div id="preview" style="display:flex;gap:8px;margin-top:12px;"></div>
+    <button class="btn btn-primary btn-block" id="start-scan" type="button">Start Enrolment Scan</button>
+    <button class="btn btn-primary btn-block" id="submit-enrol" type="button" style="display:none;margin-top:8px;">Confirm & Submit Enrolment</button>
+</div>
+
+<script src="{{ url_for('static', filename='js/capture.js') }}"></script>
+<script>
+const video = document.getElementById('video');
+const statusEl = document.getElementById('scan-status');
+let stream = null;
+(async () => { stream = await initCamera(video); })();
+
+let capturedFrames = [];
+document.getElementById('start-scan').addEventListener('click', async () => {
+  const full_name = document.getElementById('full_name').value.trim();
+  const matric_no = document.getElementById('matric_no').value.trim();
+  const department = document.getElementById('department').value.trim();
+  const email = document.getElementById('email').value.trim();
+  if (!full_name || !matric_no) { alert('Please complete Full Name and Matric Number first.'); return; }
+
+  capturedFrames = [];
+  const preview = document.getElementById('preview'); preview.innerHTML = '';
+  for (let i = 1; i <= 5; i++) {
+    statusEl.innerText = `Capturing frame ${i} of 5 — hold steady...`;
+    await sleep(500);
+    const f = grabFrame(video);
+    capturedFrames.push(f);
+    const img = document.createElement('img'); img.src = f; img.style.width='96px'; img.style.height='96px'; img.style.objectFit='cover'; img.style.borderRadius='6px'; preview.appendChild(img);
+  }
+  statusEl.innerText = 'Preview captured frames — confirm to submit.';
+  document.getElementById('submit-enrol').style.display = 'block';
+});
+
+document.getElementById('submit-enrol').addEventListener('click', async () => {
+  const full_name = document.getElementById('full_name').value.trim();
+  const matric_no = document.getElementById('matric_no').value.trim();
+  const department = document.getElementById('department').value.trim();
+  const email = document.getElementById('email').value.trim();
+  statusEl.innerText = 'Submitting enrolment...';
+  const resp = await fetch('/api/register', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ full_name, matric_no, department, email, frames: capturedFrames })
+  });
+  const data = await resp.json();
+  if (data.ok) {
+    statusEl.innerText = 'Enrolment complete.';
+    window.location.href = '/register/success/' + data.user_id;
+  } else {
+    statusEl.innerText = 'Error: ' + data.error;
+  }
+});
+</script>
+{% endblock %}

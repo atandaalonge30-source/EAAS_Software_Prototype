@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="section-head"><div><h1>Re-Enrol User</h1><p>Capture new enrolment frames for the selected user.</p></div></div>
+
+<div class="panel">
+  <h2>User</h2>
+  <div class="sub">Re-enrolling: <strong>{{ user.full_name }}</strong> — Matric: <code>{{ user.matric_no }}</code></div>
+</div>
+
+<div class="panel">
+  <h2>Facial &amp; Emotional Re-Enrolment</h2>
+  <div class="scan-wrap">
+    <div class="scan-ring"><div class="scan-frame"><video id="video" autoplay muted playsinline></video></div></div>
+    <div class="scan-status" id="scan-status">Camera idle — press "Start Re-Enrol Scan"</div>
+  </div>
+  <div id="preview" style="display:flex;gap:8px;margin-top:12px;"></div>
+  <button class="btn btn-primary btn-block" id="start-scan" type="button">Start Re-Enrol Scan</button>
+  <button class="btn btn-primary btn-block" id="submit-enrol" type="button" style="display:none;margin-top:8px;">Submit Re-Enrolment</button>
+</div>
+
+<script src="{{ url_for('static', filename='js/capture.js') }}"></script>
+<script>
+const video = document.getElementById('video');
+const statusEl = document.getElementById('scan-status');
+let stream = null;
+let frames = [];
+(async () => { stream = await initCamera(video); })();
+
+document.getElementById('start-scan').addEventListener('click', async () => {
+  frames = [];
+  const preview = document.getElementById('preview');
+  preview.innerHTML = '';
+  for (let i = 1; i <= 5; i++) {
+    statusEl.innerText = `Capturing frame ${i} of 5 — hold steady...`;
+    await sleep(500);
+    const f = grabFrame(video);
+    frames.push(f);
+    const img = document.createElement('img'); img.src = f; img.style.width='96px'; img.style.height='96px'; img.style.objectFit='cover'; img.style.borderRadius='6px'; preview.appendChild(img);
+  }
+  statusEl.innerText = 'Ready to submit.';
+  document.getElementById('submit-enrol').style.display = 'block';
+});
+
+document.getElementById('submit-enrol').addEventListener('click', async () => {
+  statusEl.innerText = 'Submitting re-enrolment...';
+  const resp = await fetch('/api/re_enrol/{{ user.id }}', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ frames })
+  });
+  const data = await resp.json();
+  if (data.ok) { window.location.href = '/admin/users'; } else { statusEl.innerText = 'Error: ' + data.error; }
+});
+</script>
+{% endblock %}
