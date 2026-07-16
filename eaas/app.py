@@ -6,8 +6,8 @@ import cv2
 import numpy as np
 from flask import Flask, render_template, request, jsonify, url_for, redirect
 
-from db import get_conn, init_db, DB_PATH
-from ml_core import (
+from .db import get_conn, init_db, DB_PATH
+from .ml_core import (
     detect_face, preprocess_face, FaceRecognizer, EmotionClassifier,
     extract_emotion_features, bootstrap_emotion_training_set, decide_access,
     IDENTITY_MIN_SIMILARITY,
