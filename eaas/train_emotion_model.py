@@ -20,11 +20,15 @@ from synth_face import make_face
 
 EMOTIONS = ["Neutral", "Happy", "Sad", "Angry", "Surprised"]
 
+# Add more varied training examples for happier and sadder expressions
+# so the classifier learns the right shape patterns.
+EMOTION_SAMPLE_MULTIPLIER = 3
+
 
 def build_dataset(samples_per_class=50):
     X, y = [], []
     for emo in EMOTIONS:
-        for i in range(samples_per_class):
+        for i in range(samples_per_class * (EMOTION_SAMPLE_MULTIPLIER if emo in ["Happy", "Sad"] else 1)):
             seed = i + 1
             jitter = (i % 5) * 0.15
             skin = i % 4

@@ -38,6 +38,15 @@ if not os.path.exists(HAAR_CASCADE_PATH):
 
 FACE_CASCADE = cv2.CascadeClassifier(HAAR_CASCADE_PATH)
 
+# Additional cascades for more robust frontal/profile face detection.
+ALT_FACE_CASCADE_PATHS = [
+    os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_alt2.xml"),
+    os.path.join(cv2.data.haarcascades, "haarcascade_profileface.xml"),
+]
+FACE_CASCADE_ALTS = [
+    cv2.CascadeClassifier(p) for p in ALT_FACE_CASCADE_PATHS if os.path.exists(p)
+]
+
 IMG_SIZE = (160, 160)
 EMOTIONS = ["Neutral", "Happy", "Sad", "Angry", "Surprised"]
 
@@ -73,26 +82,62 @@ def detect_face(bgr_image):
     h, w = bgr_image.shape[:2]
     max_dim = int(min(h, w) * 0.62)  # a face rarely fills the whole capture frame
 
-    faces = FACE_CASCADE.detectMultiScale(
-        gray, scaleFactor=1.08, minNeighbors=5,
-        minSize=(80, 80), maxSize=(max_dim, max_dim),
+    def find_best_face(cascade, gray_img, min_neighbors, min_size, max_size, scale_factor=1.05):
+        faces = cascade.detectMultiScale(
+            gray_img,
+            scaleFactor=scale_factor,
+            minNeighbors=min_neighbors,
+            minSize=min_size,
+            maxSize=max_size,
+        )
+        if len(faces) == 0:
+            return None
+        return max(faces, key=lambda f: f[2] * f[3])
+
+    faces = find_best_face(
+        FACE_CASCADE, gray, min_neighbors=4,
+        min_size=(60, 60), max_size=(max_dim, max_dim), scale_factor=1.05,
     )
 
-    if len(faces) > 0:
-        # choose the largest detected face (closest to camera)
-        x, y, fw, fh = max(faces, key=lambda f: f[2] * f[3])
+    if faces is not None:
+        x, y, fw, fh = faces
         pad = int(0.15 * fw)
         x0, y0 = max(0, x - pad), max(0, y - pad)
         x1, y1 = min(w, x + fw + pad), min(h, y + fh + pad)
         roi = bgr_image[y0:y1, x0:x1]
         return roi, (x0, y0, x1 - x0, y1 - y0), True
 
-    # Fallback: centre-weighted square crop (keeps pipeline operational
-    # for degraded captures instead of hard-failing the request)
-    side = int(min(h, w) * 0.8)
+    for alt_cascade in FACE_CASCADE_ALTS:
+        if alt_cascade.empty():
+            continue
+        alt_face = find_best_face(
+            alt_cascade, gray, min_neighbors=3,
+            min_size=(50, 50), max_size=(max_dim, max_dim), scale_factor=1.05,
+        )
+        if alt_face is not None:
+            x, y, fw, fh = alt_face
+            pad = int(0.15 * fw)
+            x0, y0 = max(0, x - pad), max(0, y - pad)
+            x1, y1 = min(w, x + fw + pad), min(h, y + fh + pad)
+            roi = bgr_image[y0:y1, x0:x1]
+            return roi, (x0, y0, x1 - x0, y1 - y0), True
+
+    side = int(min(h, w) * 0.9)
     cx, cy = w // 2, h // 2
     x0, y0 = max(0, cx - side // 2), max(0, cy - side // 2)
     roi = bgr_image[y0:y0 + side, x0:x0 + side]
+
+    try:
+        roi_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        face_roi = find_best_face(
+            FACE_CASCADE, roi_gray, min_neighbors=2,
+            min_size=(40, 40), max_size=(side, side), scale_factor=1.05,
+        )
+        if face_roi is not None:
+            return roi, (x0, y0, side, side), True
+    except Exception:
+        pass
+
     return roi, (x0, y0, side, side), False
 
 
@@ -189,10 +234,20 @@ def extract_emotion_features(gray_face):
     for region in (brow, eyes, mouth):
         region_f = region.astype(np.float32)
         mean_i = region_f.mean() / 255.0
+        sobel_x = cv2.Sobel(region_f, cv2.CV_32F, 1, 0, ksize=3)
         sobel_y = cv2.Sobel(region_f, cv2.CV_32F, 0, 1, ksize=3)
-        grad_energy = float(np.mean(np.abs(sobel_y))) / 255.0
+        grad_energy_x = float(np.mean(np.abs(sobel_x))) / 255.0
+        grad_energy_y = float(np.mean(np.abs(sobel_y))) / 255.0
         vertical_bias = float(np.mean(sobel_y)) / 255.0
-        feats.extend([mean_i, grad_energy, vertical_bias])
+        horizontal_bias = float(np.mean(sobel_x)) / 255.0
+        feats.extend([mean_i, grad_energy_x, grad_energy_y, vertical_bias, horizontal_bias])
+
+    # Add a mouth opening/brow raise indicator to separate happy/sad/surprised.
+    mouth_region = mouth.astype(np.float32)
+    mouth_opening = float(np.mean(mouth_region[-mouth_region.shape[0]//3:, :])) / 255.0
+    brow_region = brow.astype(np.float32)
+    brow_raise = float(np.mean(brow_region[:brow_region.shape[0]//3, :])) / 255.0
+    feats.extend([mouth_opening, brow_raise])
 
     return np.array(feats, dtype=np.float32)
 
