@@ -315,7 +315,7 @@ def api_login():
             baseline = u["baseline_emotion"]
             matched_user_id = user_id
 
-    decision, reason, level = decide_access(identity_conf, emotion_label, emotion_conf, baseline)
+    decision, reason, level = decide_access(identity_conf, emotion_label, emotion_conf, baseline, detected)
     fname = save_capture(roi, "login_attempt")
 
     cur = conn.execute(
@@ -338,7 +338,7 @@ def result(log_id):
     conn = get_conn()
     row = conn.execute("SELECT * FROM access_logs WHERE id=?", (log_id,)).fetchone()
     conn.close()
-    level = {"GRANTED": "success", "ADDITIONAL VERIFICATION REQUIRED": "warning"}.get(
+    level = {"SUCCESS": "success", "GRANTED": "success", "ADDITIONAL VERIFICATION REQUIRED": "warning"}.get(
         row["decision"], "danger"
     )
     image_url = url_for("static", filename=f"captures/{row['image_path']}")
@@ -358,13 +358,13 @@ def admin_logs():
         "SELECT * FROM access_logs ORDER BY id DESC"
     ).fetchall()
     conn.close()
-    level_map = {"GRANTED": "success", "ADDITIONAL VERIFICATION REQUIRED": "warning"}
+    level_map = {"SUCCESS": "success", "GRANTED": "success", "ADDITIONAL VERIFICATION REQUIRED": "warning"}
     logs = []
     total = granted = flagged = denied = 0
     for r in rows:
         total += 1
         lvl = level_map.get(r["decision"], "danger")
-        if r["decision"] == "GRANTED":
+        if r["decision"] in ("GRANTED", "SUCCESS"):
             granted += 1
         elif lvl == "warning":
             flagged += 1

@@ -1,0 +1,47 @@
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.coverage
+
+# Database
+*.db
+eaas/eaas.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Captures and logs
+eaas/static/captures/
+eaas/screenshots/
+
+# Models (optional - include these in repo)
+# eaas/models/
+
+# Flask
+instance/
+.webassets-cache
+
+# Gunicorn
+gunicorn.pid

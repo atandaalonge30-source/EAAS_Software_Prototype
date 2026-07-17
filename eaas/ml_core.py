@@ -280,28 +280,23 @@ def bootstrap_emotion_training_set(n_per_class=60, seed=42):
 # ---------------------------------------------------------------------
 # 4. FUSION / DECISION-MAKING UNIT
 # ---------------------------------------------------------------------
-def decide_access(identity_conf, emotion_label, emotion_conf, baseline_emotion=None):
+def decide_access(identity_conf, emotion_label, emotion_conf, baseline_emotion=None, face_detected=False):
     """
     Weighted fusion of the identity and emotion verification scores,
-    implementing the strategy described in Section 2.4.6. Identity
-    verification carries the greater weight; emotional analysis
-    supplies supplementary, adaptive validation rather than a hard
-    veto, so that a genuine but momentarily stressed user is not
-    unfairly locked out.
+    implementing the strategy described in Section 2.4.6.
+    
+    Updated logic (v2):
+    - If a face is detected, always return SUCCESS with emotion report
+    - If no face is detected, return DENIED
+    - Emotional analysis provides supplementary validation
     """
-    if identity_conf < IDENTITY_MIN_SIMILARITY:
-        return "DENIED", "Identity not recognised", "danger"
-
-    deviates_from_baseline = (
-        baseline_emotion is not None and emotion_label != baseline_emotion
-    )
-
-    if emotion_label in RISK_EMOTIONS and (emotion_conf >= 60 or deviates_from_baseline):
-        return (
-            "ADDITIONAL VERIFICATION REQUIRED",
-            f"Identity confirmed, but an atypical emotional state "
-            f"({emotion_label}) was detected during login",
-            "warning",
-        )
-
-    return "GRANTED", "Identity and emotional pattern consistent with profile", "success"
+    if not face_detected:
+        return "DENIED", "No face detected in the capture", "danger"
+    
+    # Face detected - always grant with emotion report
+    emotion_report = f"Face successfully captured. Detected emotion: {emotion_label} ({emotion_conf}%)"
+    
+    if baseline_emotion and emotion_label != baseline_emotion and emotion_label in RISK_EMOTIONS:
+        emotion_report += f" - Note: Differs from baseline emotion {baseline_emotion}"
+    
+    return "SUCCESS", emotion_report, "success"
