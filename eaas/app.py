@@ -32,9 +32,9 @@ def ensure_bootstrapped():
         init_db()
     if not emotion_clf.trained:
         emotion_clf.load()
-        if not emotion_clf.trained:
-            X, y = bootstrap_emotion_training_set()
-            emotion_clf.train(X, y)
+    if not emotion_clf.trained:
+        X, y = bootstrap_emotion_training_set()
+        emotion_clf.train(X, y)
     face_recognizer.load()
 
 
@@ -67,47 +67,35 @@ def find_existing_face_match(conn, gray_faces, similarity_threshold=78.0):
     return None
 
 
+from contextlib import suppress
+
 def delete_access_log(conn, log_id):
-    row = conn.execute("SELECT image_path FROM access_logs WHERE id=?", (log_id,)).fetchone()
-    if row is None:
+    if not (row := conn.execute("SELECT image_path FROM access_logs WHERE id=?", (log_id,)).fetchone()):
         return False
 
     conn.execute("DELETE FROM access_logs WHERE id=?", (log_id,))
     image_path = row["image_path"]
     if image_path:
-        try:
+        with suppress(FileNotFoundError, OSError):
             os.remove(os.path.join(CAPTURE_DIR, image_path))
-        except FileNotFoundError:
-            pass
-        except OSError:
-            pass
     return True
 
 
 def delete_user(conn, user_id):
-    user = conn.execute("SELECT photo_path FROM users WHERE id=?", (user_id,)).fetchone()
-    if user is None:
+    if not (user := conn.execute("SELECT photo_path FROM users WHERE id=?", (user_id,)).fetchone()):
         return False
 
     conn.execute("DELETE FROM access_logs WHERE user_id=?", (user_id,))
     conn.execute("DELETE FROM users WHERE id=?", (user_id,))
 
     if user["photo_path"]:
-        try:
+        with suppress(FileNotFoundError, OSError):
             os.remove(os.path.join(CAPTURE_DIR, user["photo_path"]))
-        except FileNotFoundError:
-            pass
-        except OSError:
-            pass
 
     for fname in os.listdir(CAPTURE_DIR):
         if fname.startswith(f"user{user_id}_enrol"):
-            try:
+            with suppress(FileNotFoundError, OSError):
                 os.remove(os.path.join(CAPTURE_DIR, fname))
-            except FileNotFoundError:
-                pass
-            except OSError:
-                pass
     return True
 
 
@@ -221,8 +209,7 @@ def api_re_enrol(user_id):
         return jsonify(ok=False, error="No frames received"), 400
 
     conn = get_conn()
-    u = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
-    if not u:
+    if not (u := conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()):
         conn.close()
         return jsonify(ok=False, error="User not found"), 404
 
@@ -408,10 +395,10 @@ def admin_model():
         "emotion_trained": bool(emotion_clf.trained),
     }
     # prepare label map list for display
-    label_map = []
-    if hasattr(face_recognizer, 'label_map') and isinstance(face_recognizer.label_map, dict):
-        for label, uid in face_recognizer.label_map.items():
-            label_map.append({"label": int(label), "user_id": int(uid)})
+    label_map = [
+        {"label": int(label), "user_id": int(uid)}
+        for label, uid in face_recognizer.label_map.items()
+    ] if hasattr(face_recognizer, 'label_map') and isinstance(face_recognizer.label_map, dict) else []
     return render_template("admin_model.html", active="logs", status=status, label_map=label_map)
 
 

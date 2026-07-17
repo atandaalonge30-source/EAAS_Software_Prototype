@@ -18,6 +18,8 @@ scope defined in Chapter One (Section 1.5).
 """
 
 import os
+from contextlib import suppress
+
 import cv2
 import numpy as np
 from sklearn.neural_network import MLPClassifier
@@ -127,7 +129,7 @@ def detect_face(bgr_image):
     x0, y0 = max(0, cx - side // 2), max(0, cy - side // 2)
     roi = bgr_image[y0:y0 + side, x0:x0 + side]
 
-    try:
+    with suppress(Exception):
         roi_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
         face_roi = find_best_face(
             FACE_CASCADE, roi_gray, min_neighbors=2,
@@ -135,8 +137,6 @@ def detect_face(bgr_image):
         )
         if face_roi is not None:
             return roi, (x0, y0, side, side), True
-    except Exception:
-        pass
 
     return roi, (x0, y0, side, side), False
 
@@ -173,8 +173,8 @@ class FaceRecognizer:
     def train(self, samples):
         """samples: list of (user_id:int, gray_image np.ndarray)"""
         images, labels = [], []
-        unique_ids = sorted(set(u for u, _ in samples))
-        self.label_map = {i: uid for i, uid in enumerate(unique_ids)}
+        unique_ids = sorted({u for u, _ in samples})
+        self.label_map = dict(enumerate(unique_ids))
         inv_map = {uid: i for i, uid in self.label_map.items()}
 
         for uid, img in samples:
@@ -324,9 +324,11 @@ def bootstrap_emotion_training_set(n_per_class=60, seed=42):
             row = []
             for region_key in ("brow", "eyes", "mouth"):
                 mean_i, energy, bias = regions[region_key]
-                row.append(mean_i + rng.normal(0, 0.04))
-                row.append(max(0.0, energy + rng.normal(0, 0.03)))
-                row.append(bias + rng.normal(0, 0.03))
+                row.extend([
+                    mean_i + rng.normal(0, 0.04),
+                    max(0.0, energy + rng.normal(0, 0.03)),
+                    bias + rng.normal(0, 0.03),
+                ])
             X.append(row)
             y.append(label)
     return np.array(X, dtype=np.float32), np.array(y)
