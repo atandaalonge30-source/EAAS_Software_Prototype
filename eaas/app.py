@@ -338,6 +338,9 @@ def result(log_id):
     conn = get_conn()
     row = conn.execute("SELECT * FROM access_logs WHERE id=?", (log_id,)).fetchone()
     conn.close()
+    if row is None:
+        return "Result not found", 404
+
     level = {"SUCCESS": "success", "GRANTED": "success", "ADDITIONAL VERIFICATION REQUIRED": "warning"}.get(
         row["decision"], "danger"
     )
