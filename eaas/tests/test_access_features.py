@@ -8,8 +8,9 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-import app as app_module
-import db as db_module
+import eaas.app as app_module
+import eaas.db as db_module
+import eaas.ml_core as ml_core_module
 
 
 class AccessFeatureTests(unittest.TestCase):
@@ -89,6 +90,42 @@ class AccessFeatureTests(unittest.TestCase):
         self.assertIsNone(user_row)
         self.assertIsNone(log_row)
         conn.close()
+
+    def test_decide_access_requires_high_emotion_confidence_for_success(self):
+        decision, reason, level = ml_core_module.decide_access(
+            identity_conf=80.0,
+            emotion_label="Happy",
+            emotion_conf=85.0,
+            baseline_emotion="Neutral",
+            face_detected=True,
+        )
+        self.assertEqual(decision, "SUCCESS")
+        self.assertEqual(level, "success")
+        self.assertIn("Detected emotion: Happy (85.0%)", reason)
+
+    def test_decide_access_warns_when_emotion_confidence_is_low(self):
+        decision, reason, level = ml_core_module.decide_access(
+            identity_conf=80.0,
+            emotion_label="Happy",
+            emotion_conf=60.0,
+            baseline_emotion="Neutral",
+            face_detected=True,
+        )
+        self.assertEqual(decision, "ADDITIONAL VERIFICATION REQUIRED")
+        self.assertEqual(level, "warning")
+        self.assertIn("emotion confidence is lower than 80.0%", reason)
+
+    def test_decide_access_denies_when_both_confidences_are_low(self):
+        decision, reason, level = ml_core_module.decide_access(
+            identity_conf=20.0,
+            emotion_label="Happy",
+            emotion_conf=50.0,
+            baseline_emotion="Neutral",
+            face_detected=True,
+        )
+        self.assertEqual(decision, "DENIED")
+        self.assertEqual(level, "danger")
+        self.assertIn("both emotion confidence (50.0%) and identity confidence (20.0%) are insufficient", reason)
 
 
 if __name__ == "__main__":

@@ -51,6 +51,8 @@ FACE_CASCADE_ALTS = [
 
 IMG_SIZE = (160, 160)
 EMOTIONS = ["Neutral", "Happy", "Sad", "Angry", "Surprised"]
+EMOTION_FEATURE_DIM = 17
+EMOTION_CONFIDENCE_THRESHOLD = 80.0
 
 # Identity match is reported as a similarity percentage (100% = perfect
 # match). LBPH internally returns a *distance* (lower = more similar);
@@ -327,8 +329,13 @@ def bootstrap_emotion_training_set(n_per_class=60, seed=42):
                 row.extend([
                     mean_i + rng.normal(0, 0.04),
                     max(0.0, energy + rng.normal(0, 0.03)),
+                    max(0.0, energy + rng.normal(0, 0.03)),
                     bias + rng.normal(0, 0.03),
+                    rng.normal(0.0, 0.02),
                 ])
+            mouth_opening = regions["mouth"][0] + rng.normal(0, 0.04)
+            brow_raise = regions["brow"][0] + rng.normal(0, 0.04)
+            row.extend([mouth_opening, brow_raise])
             X.append(row)
             y.append(label)
     return np.array(X, dtype=np.float32), np.array(y)
@@ -341,19 +348,31 @@ def decide_access(identity_conf, emotion_label, emotion_conf, baseline_emotion=N
     """
     Weighted fusion of the identity and emotion verification scores,
     implementing the strategy described in Section 2.4.6.
-    
-    Updated logic (v2):
-    - If a face is detected, always return SUCCESS with emotion report
-    - If no face is detected, return DENIED
-    - Emotional analysis provides supplementary validation
+
+    Access is granted only when a face is detected and the emotion
+    recognition confidence is strong enough to indicate a stable capture.
+    Lower-confidence emotion readings still generate informative warnings
+    or denials so the system remains secure and transparent.
     """
     if not face_detected:
         return "DENIED", "No face detected in the capture", "danger"
-    
-    # Face detected - always grant with emotion report
+
     emotion_report = f"Face successfully captured. Detected emotion: {emotion_label} ({emotion_conf}%)"
-    
     if baseline_emotion and emotion_label != baseline_emotion and emotion_label in RISK_EMOTIONS:
         emotion_report += f" - Note: Differs from baseline emotion {baseline_emotion}"
-    
-    return "SUCCESS", emotion_report, "success"
+
+    if emotion_conf >= EMOTION_CONFIDENCE_THRESHOLD:
+        return "SUCCESS", emotion_report, "success"
+
+    if identity_conf >= IDENTITY_MIN_SIMILARITY:
+        return (
+            "ADDITIONAL VERIFICATION REQUIRED",
+            f"Face captured but emotion confidence is lower than {EMOTION_CONFIDENCE_THRESHOLD}%. Please retry with a clearer expression.",
+            "warning",
+        )
+
+    return (
+        "DENIED",
+        f"Face captured, but both emotion confidence ({emotion_conf}%) and identity confidence ({identity_conf}%) are insufficient.",
+        "danger",
+    )
