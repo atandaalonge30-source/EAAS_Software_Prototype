@@ -281,20 +281,40 @@ def is_human_face(gray_face, roi_bgr=None):
     """
     with suppress(Exception):
         if EYE_CASCADE is not None:
-            eyes = EYE_CASCADE.detectMultiScale(gray_face, scaleFactor=1.1, minNeighbors=3, minSize=(10, 10))
+            eyes = EYE_CASCADE.detectMultiScale(
+                gray_face,
+                scaleFactor=1.1,
+                minNeighbors=3,
+                minSize=(10, 10),
+            )
             if len(eyes) >= 1:
                 return True
 
-        # Fallback: check for skin-like color proportion in the BGR ROI
         if roi_bgr is not None:
-            hsv = cv2.cvtColor(roi_bgr, cv2.COLOR_BGR2HSV)
-            # a permissive skin-color range in HSV (may vary across skin tones)
-            lower = np.array([0, 15, 60], dtype=np.uint8)
-            upper = np.array([25, 200, 255], dtype=np.uint8)
-            mask = cv2.inRange(hsv, lower, upper)
-            skin_ratio = float(np.count_nonzero(mask)) / (mask.size + 1e-9)
-            if skin_ratio > 0.03:
+            # Try a YCrCb skin-color heuristic that is more robust across
+            # a wider range of skin tones than the HSV-only variant.
+            ycrcb = cv2.cvtColor(roi_bgr, cv2.COLOR_BGR2YCrCb)
+            lower_ycrcb = np.array([0, 133, 77], dtype=np.uint8)
+            upper_ycrcb = np.array([255, 173, 127], dtype=np.uint8)
+            mask_ycrcb = cv2.inRange(ycrcb, lower_ycrcb, upper_ycrcb)
+            skin_ratio_ycrcb = float(np.count_nonzero(mask_ycrcb)) / (mask_ycrcb.size + 1e-9)
+            if skin_ratio_ycrcb > 0.02:
                 return True
+
+            hsv = cv2.cvtColor(roi_bgr, cv2.COLOR_BGR2HSV)
+            lower_hsv = np.array([0, 15, 0], dtype=np.uint8)
+            upper_hsv = np.array([50, 255, 255], dtype=np.uint8)
+            mask_hsv = cv2.inRange(hsv, lower_hsv, upper_hsv)
+            skin_ratio_hsv = float(np.count_nonzero(mask_hsv)) / (mask_hsv.size + 1e-9)
+            if skin_ratio_hsv > 0.02:
+                return True
+
+        # If no explicit facial keypoints are detected, use a fallback
+        # edge/contrast heuristic to accept genuine faces with lower
+        # quality or non-ideal lighting.
+        grad = cv2.Laplacian(gray_face, cv2.CV_32F)
+        if float(np.std(grad)) > 8.0 and float(np.mean(np.abs(grad))) > 5.0:
+            return True
     return False
 
 
