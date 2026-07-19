@@ -28,6 +28,31 @@ face_recognizer = FaceRecognizer()
 emotion_clf = EmotionClassifier()
 
 
+def cleanup_problematic_users(names_contains=("michael",)):
+    """Remove any users whose full_name contains one of the provided
+    substrings (case-insensitive). This is intended as an emergency
+    cleanup on startup to remove problematic pre-enrolled identities.
+    """
+    conn = get_conn()
+    try:
+        rows = conn.execute("SELECT id, full_name FROM users").fetchall()
+        to_delete = [r["id"] for r in rows if any(n.lower() in (r["full_name"] or "").lower() for n in names_contains)]
+        for uid in to_delete:
+            delete_user(conn, uid)
+        if to_delete:
+            # retrain recognizer after removals
+            retrain_face_recognizer(conn)
+            conn.commit()
+    finally:
+        conn.close()
+
+
+# Run bootstrap and emergency cleanup at module import so deployed
+# instances remove the problematic pre-enrolment automatically.
+ensure_bootstrapped()
+cleanup_problematic_users(("michael",))
+
+
 def ensure_bootstrapped():
     if not os.path.exists(DB_PATH):
         init_db()
