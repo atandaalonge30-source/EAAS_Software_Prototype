@@ -200,9 +200,33 @@ def api_register():
 
     # retrain LBPH recognizer across ALL enrolled users' stored samples
     retrain_face_recognizer(conn)
+
+    # Ensure the in-memory recognizer is updated immediately so the
+    # newly-enrolled user can be recognised right after registration.
+    try:
+        face_recognizer.load()
+    except Exception:
+        # non-fatal; recognizer may already be current
+        pass
+
+    # Quick self-check: predict on the representative photo we just saved
+    enrol_conf = None
+    try:
+        if representative_photo:
+            p = os.path.join(CAPTURE_DIR, representative_photo)
+            img = cv2.imread(p)
+            if img is not None:
+                gray = preprocess_face(img)
+                pred_uid, pred_sim = face_recognizer.predict(gray)
+                enrol_conf = float(pred_sim)
+    except Exception:
+        enrol_conf = None
+
     conn.close()
 
-    return jsonify(ok=True, user_id=user_id)
+    # Return the new user id and a quick enrolment confidence metric so
+    # the frontend can show immediate success if recognition is strong.
+    return jsonify(ok=True, user_id=user_id, enrol_identity_confidence=enrol_conf)
 
 
 @app.route("/api/re_enrol/<int:user_id>", methods=["POST"])
