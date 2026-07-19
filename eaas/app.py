@@ -219,14 +219,43 @@ def api_register():
                 gray = preprocess_face(img)
                 pred_uid, pred_sim = face_recognizer.predict(gray)
                 enrol_conf = float(pred_sim)
+
+                # Run emotion prediction on the representative ROI
+                feats = extract_emotion_features(gray)
+                emotion_label, emotion_conf = emotion_clf.predict(feats)
+
+                # Verify human face heuristics
+                face_is_human = is_human_face(gray, roi) or detected or (pred_sim >= ml_core_min_similarity())
+
+                # Decide access and create an access_log entry so the user
+                # can be immediately directed to the result page.
+                decision, reason, level = decide_access(
+                    pred_sim, emotion_label, emotion_conf, baseline, detected, face_is_human
+                )
+
+                cur = conn.execute(
+                    """INSERT INTO access_logs
+                       (user_id, attempt_name, identity_confidence, emotion_label,
+                        emotion_confidence, decision, reason, image_path, face_detected)
+                       VALUES (?,?,?,?,?,?,?,?,?)""",
+                    (user_id if pred_sim >= ml_core_min_similarity() else None,
+                     full_name, pred_sim, emotion_label, emotion_conf,
+                     decision, reason, representative_photo, int(detected)),
+                )
+                log_id = cur.lastrowid
+                conn.commit()
     except Exception:
         enrol_conf = None
 
     conn.close()
 
-    # Return the new user id and a quick enrolment confidence metric so
-    # the frontend can show immediate success if recognition is strong.
-    return jsonify(ok=True, user_id=user_id, enrol_identity_confidence=enrol_conf)
+    # Return the new user id, quick enrol confidence and optional log id
+    # so the frontend can redirect to the result page if desired.
+    resp = {"ok": True, "user_id": user_id, "enrol_identity_confidence": enrol_conf}
+    if 'log_id' in locals() and log_id:
+        resp["log_id"] = log_id
+        resp["result_url"] = url_for("result", log_id=log_id)
+    return jsonify(resp)
 
 
 @app.route("/api/re_enrol/<int:user_id>", methods=["POST"])
