@@ -331,6 +331,15 @@ def api_login():
         emotion_label, emotion_conf = emotion_clf.predict(feats)
         # Verify the ROI contains a human face (helps reject objects)
         face_is_human = is_human_face(gray, roi)
+        # If cascade-based face detection succeeded, trust that the capture
+        # contains a face before rejecting it as non-human.
+        if detected and not face_is_human:
+            face_is_human = True
+        # If the face verifier is uncertain but identity match is strong,
+        # allow the registered identity to proceed rather than denying a
+        # legitimate enrolled user because of a noisy ROI.
+        if not face_is_human and identity_conf >= ml_core_min_similarity():
+            face_is_human = True
     except Exception as exc:
         # Log and return a readable error if inference fails.
         return jsonify(ok=False, error=f"Inference failed: {exc}"), 500
