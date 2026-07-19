@@ -103,7 +103,7 @@ class AccessFeatureTests(unittest.TestCase):
         self.assertEqual(level, "success")
         self.assertIn("Detected emotion: Happy (85.0%)", reason)
 
-    def test_decide_access_warns_when_emotion_confidence_is_low(self):
+    def test_decide_access_warns_when_emotion_confidence_is_low_but_identity_is_ok(self):
         decision, reason, level = ml_core_module.decide_access(
             identity_conf=80.0,
             emotion_label="Happy",
@@ -111,9 +111,9 @@ class AccessFeatureTests(unittest.TestCase):
             baseline_emotion="Neutral",
             face_detected=True,
         )
-        self.assertEqual(decision, "ADDITIONAL VERIFICATION REQUIRED")
-        self.assertEqual(level, "warning")
-        self.assertIn("emotion confidence is lower than 80.0%", reason)
+        self.assertEqual(decision, "SUCCESS")
+        self.assertEqual(level, "success")
+        self.assertIn("Emotion confidence is below 80.0% but identity match is acceptable.", reason)
 
     def test_decide_access_denies_when_both_confidences_are_low(self):
         decision, reason, level = ml_core_module.decide_access(

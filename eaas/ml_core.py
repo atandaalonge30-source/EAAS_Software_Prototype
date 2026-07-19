@@ -361,18 +361,26 @@ def decide_access(identity_conf, emotion_label, emotion_conf, baseline_emotion=N
     if baseline_emotion and emotion_label != baseline_emotion and emotion_label in RISK_EMOTIONS:
         emotion_report += f" - Note: Differs from baseline emotion {baseline_emotion}"
 
-    if emotion_conf >= EMOTION_CONFIDENCE_THRESHOLD:
-        return "SUCCESS", emotion_report, "success"
-
     if identity_conf >= IDENTITY_MIN_SIMILARITY:
+        if emotion_conf >= EMOTION_CONFIDENCE_THRESHOLD:
+            return "SUCCESS", emotion_report, "success"
+
         return (
-            "ADDITIONAL VERIFICATION REQUIRED",
-            f"Face captured but emotion confidence is lower than {EMOTION_CONFIDENCE_THRESHOLD}%. Please retry with a clearer expression.",
-            "warning",
+            "SUCCESS",
+            f"{emotion_report} Emotion confidence is below {EMOTION_CONFIDENCE_THRESHOLD}% but identity match is acceptable.",
+            "success",
+        )
+
+    # If both scores are low, provide a more informative denial message.
+    if emotion_conf < EMOTION_CONFIDENCE_THRESHOLD:
+        return (
+            "DENIED",
+            f"Face captured, but both emotion confidence ({emotion_conf}%) and identity confidence ({identity_conf}%) are insufficient to authenticate.",
+            "danger",
         )
 
     return (
         "DENIED",
-        f"Face captured, but both emotion confidence ({emotion_conf}%) and identity confidence ({identity_conf}%) are insufficient.",
+        f"Face captured, but identity confidence ({identity_conf}%) is insufficient to authenticate.",
         "danger",
     )

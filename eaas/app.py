@@ -283,13 +283,17 @@ def api_login():
     if not frame_b64:
         return jsonify(ok=False, error="No frame received"), 400
 
-    bgr = decode_frame(frame_b64)
-    roi, bbox, detected = detect_face(bgr)
-    gray = preprocess_face(roi)
+    try:
+        bgr = decode_frame(frame_b64)
+        roi, bbox, detected = detect_face(bgr)
+        gray = preprocess_face(roi)
 
-    user_id, identity_conf = face_recognizer.predict(gray)
-    feats = extract_emotion_features(gray)
-    emotion_label, emotion_conf = emotion_clf.predict(feats)
+        user_id, identity_conf = face_recognizer.predict(gray)
+        feats = extract_emotion_features(gray)
+        emotion_label, emotion_conf = emotion_clf.predict(feats)
+    except Exception as exc:
+        # Log and return a readable error if inference fails.
+        return jsonify(ok=False, error=f"Inference failed: {exc}"), 500
 
     conn = get_conn()
     name = "Unknown"
