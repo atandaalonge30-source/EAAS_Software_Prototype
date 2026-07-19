@@ -98,9 +98,7 @@ def detect_face(bgr_image):
             minSize=min_size,
             maxSize=max_size,
         )
-        if len(faces) == 0:
-            return None
-        return max(faces, key=lambda f: f[2] * f[3])
+        return max(faces, key=lambda f: f[2] * f[3]) if len(faces) else None
 
     faces = find_best_face(
         FACE_CASCADE, gray, min_neighbors=4,
@@ -148,7 +146,7 @@ def detect_face(bgr_image):
     # whether the centre crop likely contains a face-like pattern.
     # This helps when Haar cascades fail on low-resolution or angled
     # webcam captures but the ROI still contains facial structure.
-    try:
+    with suppress(Exception):
         roi_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
         roi_f = roi_gray.astype(np.float32)
         sx = cv2.Sobel(roi_f, cv2.CV_32F, 1, 0, ksize=3)
@@ -159,8 +157,6 @@ def detect_face(bgr_image):
         # mouth). This is permissive but reduces false negatives.
         if grad_energy > 0.02:
             return roi, (x0, y0, side, side), True
-    except Exception:
-        pass
 
     return roi, (x0, y0, side, side), False
 
@@ -283,7 +279,7 @@ def is_human_face(gray_face, roi_bgr=None):
     BGR ROI when available. Returns True if the ROI likely contains a
     human face, False otherwise.
     """
-    try:
+    with suppress(Exception):
         if EYE_CASCADE is not None:
             eyes = EYE_CASCADE.detectMultiScale(gray_face, scaleFactor=1.1, minNeighbors=3, minSize=(10, 10))
             if len(eyes) >= 1:
@@ -299,8 +295,6 @@ def is_human_face(gray_face, roi_bgr=None):
             skin_ratio = float(np.count_nonzero(mask)) / (mask.size + 1e-9)
             if skin_ratio > 0.03:
                 return True
-    except Exception:
-        pass
     return False
 
 

@@ -11,7 +11,7 @@ from .db import get_conn, init_db, DB_PATH
 from .ml_core import (
     detect_face, preprocess_face, FaceRecognizer, EmotionClassifier,
     extract_emotion_features, bootstrap_emotion_training_set, decide_access,
-    IDENTITY_MIN_SIMILARITY,
+    is_human_face, IDENTITY_MIN_SIMILARITY,
 )
 
 
@@ -220,10 +220,8 @@ def api_re_enrol(user_id):
     # remove old enrolment files for this user so we start fresh
     for fname in os.listdir(CAPTURE_DIR):
         if fname.startswith(f"user{user_id}_enrol"):
-            try:
+            with suppress(FileNotFoundError, OSError):
                 os.remove(os.path.join(CAPTURE_DIR, fname))
-            except Exception:
-                pass
 
     representative_photo = None
     emotion_feats = []
