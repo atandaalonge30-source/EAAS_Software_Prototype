@@ -352,13 +352,11 @@ def api_login():
     # the result even if the similarity is below the acceptance
     # threshold. `matched_user_id` is only set when similarity is
     # sufficiently high for authentication.
-    if user_id is not None:
-        u = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
-        if u:
-            name = u["full_name"]
-            baseline = u["baseline_emotion"]
-            if identity_conf >= ml_core_min_similarity():
-                matched_user_id = user_id
+    if user_id is not None and (u := conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()):
+        name = u["full_name"]
+        baseline = u["baseline_emotion"]
+        if identity_conf >= ml_core_min_similarity():
+            matched_user_id = user_id
 
     decision, reason, level = decide_access(
         identity_conf, emotion_label, emotion_conf, baseline, detected, face_is_human
