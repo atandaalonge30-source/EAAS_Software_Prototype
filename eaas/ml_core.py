@@ -49,6 +49,10 @@ FACE_CASCADE_ALTS = [
     cv2.CascadeClassifier(p) for p in ALT_FACE_CASCADE_PATHS if os.path.exists(p)
 ]
 
+# Eye cascade for lightweight human verification
+EYE_CASCADE_PATH = os.path.join(cv2.data.haarcascades, "haarcascade_eye.xml")
+EYE_CASCADE = cv2.CascadeClassifier(EYE_CASCADE_PATH) if os.path.exists(EYE_CASCADE_PATH) else None
+
 IMG_SIZE = (160, 160)
 EMOTIONS = ["Neutral", "Happy", "Sad", "Angry", "Surprised"]
 EMOTION_FEATURE_DIM = 17
@@ -139,6 +143,24 @@ def detect_face(bgr_image):
         )
         if face_roi is not None:
             return roi, (x0, y0, side, side), True
+
+    # No cascade detection — apply a lightweight heuristic to decide
+    # whether the centre crop likely contains a face-like pattern.
+    # This helps when Haar cascades fail on low-resolution or angled
+    # webcam captures but the ROI still contains facial structure.
+    try:
+        roi_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        roi_f = roi_gray.astype(np.float32)
+        sx = cv2.Sobel(roi_f, cv2.CV_32F, 1, 0, ksize=3)
+        sy = cv2.Sobel(roi_f, cv2.CV_32F, 0, 1, ksize=3)
+        grad_energy = float(np.mean(np.abs(sx)) + np.mean(np.abs(sy))) / 255.0
+        # Empirically-chosen threshold: if gradient energy is reasonably
+        # high the region probably contains facial edges (eyes, nose,
+        # mouth). This is permissive but reduces false negatives.
+        if grad_energy > 0.02:
+            return roi, (x0, y0, side, side), True
+    except Exception:
+        pass
 
     return roi, (x0, y0, side, side), False
 
@@ -254,6 +276,34 @@ def extract_emotion_features(gray_face):
     return np.array(feats, dtype=np.float32)
 
 
+def is_human_face(gray_face, roi_bgr=None):
+    """
+    Heuristic human-face verifier. Uses an eye Haar-cascade on the
+    grayscale crop and a fallback lightweight skin-color check on the
+    BGR ROI when available. Returns True if the ROI likely contains a
+    human face, False otherwise.
+    """
+    try:
+        if EYE_CASCADE is not None:
+            eyes = EYE_CASCADE.detectMultiScale(gray_face, scaleFactor=1.1, minNeighbors=3, minSize=(10, 10))
+            if len(eyes) >= 1:
+                return True
+
+        # Fallback: check for skin-like color proportion in the BGR ROI
+        if roi_bgr is not None:
+            hsv = cv2.cvtColor(roi_bgr, cv2.COLOR_BGR2HSV)
+            # a permissive skin-color range in HSV (may vary across skin tones)
+            lower = np.array([0, 15, 60], dtype=np.uint8)
+            upper = np.array([25, 200, 255], dtype=np.uint8)
+            mask = cv2.inRange(hsv, lower, upper)
+            skin_ratio = float(np.count_nonzero(mask)) / (mask.size + 1e-9)
+            if skin_ratio > 0.03:
+                return True
+    except Exception:
+        pass
+    return False
+
+
 class EmotionClassifier:
     """
     A lightweight Multi-Layer Perceptron (Artificial Neural Network)
@@ -355,7 +405,7 @@ def bootstrap_emotion_training_set(n_per_class=60, seed=42):
 # ---------------------------------------------------------------------
 # 4. FUSION / DECISION-MAKING UNIT
 # ---------------------------------------------------------------------
-def decide_access(identity_conf, emotion_label, emotion_conf, baseline_emotion=None, face_detected=False):
+def decide_access(identity_conf, emotion_label, emotion_conf, baseline_emotion=None, face_detected=False, face_is_human=True):
     """
     Weighted fusion of the identity and emotion verification scores,
     implementing the strategy described in Section 2.4.6.
@@ -365,7 +415,22 @@ def decide_access(identity_conf, emotion_label, emotion_conf, baseline_emotion=N
     Lower-confidence emotion readings still generate informative warnings
     or denials so the system remains secure and transparent.
     """
+    # If the capture is determined to be a non-human object, deny.
+    if not face_is_human:
+        return "DENIED", "Capture does not appear to contain a human face.", "danger"
+
     if not face_detected:
+        # If cascade detection failed but identity is strong, allow a
+        # permissive success path. This helps noisy webcam captures
+        # where the face detector misses but the recognizer still
+        # reports a high similarity.
+        if identity_conf >= IDENTITY_MIN_SIMILARITY:
+            return (
+                "SUCCESS",
+                f"Weak face detection but identity similarity is high ({identity_conf}%). Proceeding based on identity.",
+                "success",
+            )
+
         return "DENIED", "No face detected in the capture", "danger"
 
     emotion_report = f"Face successfully captured. Detected emotion: {emotion_label} ({emotion_conf}%)"

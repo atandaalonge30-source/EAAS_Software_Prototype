@@ -283,18 +283,56 @@ def register_success(user_id):
 @app.route("/api/login", methods=["POST"])
 def api_login():
     payload = request.get_json()
+    # Support two modes:
+    # - single `frame` (legacy) : one-shot inference (kept permissive)
+    # - multi `frames` : list of base64 frames captured over ~1s for liveness checks
+    frames_b64 = payload.get("frames")
     frame_b64 = payload.get("frame")
-    if not frame_b64:
-        return jsonify(ok=False, error="No frame received"), 400
+    if not frames_b64 and not frame_b64:
+        return jsonify(ok=False, error="No frame(s) received"), 400
 
     try:
-        bgr = decode_frame(frame_b64)
-        roi, bbox, detected = detect_face(bgr)
-        gray = preprocess_face(roi)
+        if frames_b64 and isinstance(frames_b64, list) and len(frames_b64) >= 2:
+            bgrs = [decode_frame(f) for f in frames_b64]
+            rois = []
+            grays = []
+            detected_flags = []
+            human_votes = 0
+            for bgr in bgrs:
+                roi, bbox, detected = detect_face(bgr)
+                gray = preprocess_face(roi)
+                rois.append(roi)
+                grays.append(gray)
+                detected_flags.append(detected)
+                if is_human_face(gray, roi):
+                    human_votes += 1
+
+            # Lightweight inter-frame motion check (mean absolute diff)
+            diffs = []
+            for i in range(1, len(grays)):
+                d = np.mean(np.abs(grays[i].astype(np.float32) - grays[i-1].astype(np.float32)))
+                diffs.append(d)
+            motion_score = (np.mean(diffs) / 255.0) if diffs else 0.0
+
+            # Require majority human votes and some motion to consider live
+            if human_votes < max(1, len(grays) // 2) or motion_score < 0.01:
+                return jsonify(ok=False, error="Liveness check failed: please present a live human face (move slightly)."), 400
+
+            # Use the median frame (center) for recognition/emotion
+            mid = len(rois) // 2
+            roi = rois[mid]
+            gray = grays[mid]
+            detected = any(detected_flags)
+        else:
+            bgr = decode_frame(frame_b64 or frames_b64[0])
+            roi, bbox, detected = detect_face(bgr)
+            gray = preprocess_face(roi)
 
         user_id, identity_conf = face_recognizer.predict(gray)
         feats = extract_emotion_features(gray)
         emotion_label, emotion_conf = emotion_clf.predict(feats)
+        # Verify the ROI contains a human face (helps reject objects)
+        face_is_human = is_human_face(gray, roi)
     except Exception as exc:
         # Log and return a readable error if inference fails.
         return jsonify(ok=False, error=f"Inference failed: {exc}"), 500
@@ -310,7 +348,9 @@ def api_login():
             baseline = u["baseline_emotion"]
             matched_user_id = user_id
 
-    decision, reason, level = decide_access(identity_conf, emotion_label, emotion_conf, baseline, detected)
+    decision, reason, level = decide_access(
+        identity_conf, emotion_label, emotion_conf, baseline, detected, face_is_human
+    )
     fname = save_capture(roi, "login_attempt")
 
     cur = conn.execute(
