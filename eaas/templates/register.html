@@ -70,7 +70,12 @@ document.getElementById('submit-enrol').addEventListener('click', async () => {
   const data = await resp.json();
   if (data.ok) {
     statusEl.innerText = 'Enrolment complete.';
-    window.location.href = '/register/success/' + data.user_id;
+    // Prefer redirecting to the immediate result page if backend returned it
+    if (data.result_url) {
+      window.location.href = data.result_url;
+    } else {
+      window.location.href = '/register/success/' + data.user_id;
+    }
   } else {
     statusEl.innerText = 'Error: ' + data.error;
   }
