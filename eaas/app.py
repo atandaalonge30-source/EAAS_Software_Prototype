@@ -1,5 +1,6 @@
 import os
 import base64
+import sqlite3
 import uuid
 
 import cv2
@@ -150,15 +151,17 @@ def api_register():
 
     conn = get_conn()
 
-    # process captured frames first so we can reject duplicate faces before creating a new account
+    # process captured frames once so we can reject duplicate faces before creating a new account
     gray_faces = []
     emotion_feats = []
+    face_rois = []
     for fb64 in frames_b64:
         bgr = decode_frame(fb64)
         roi, bbox, detected = detect_face(bgr)
         gray = preprocess_face(roi)
         gray_faces.append(gray)
         emotion_feats.append(extract_emotion_features(gray))
+        face_rois.append(roi)
 
     existing_user_id = find_existing_face_match(conn, gray_faces)
     if existing_user_id is not None:
@@ -172,14 +175,15 @@ def api_register():
         )
         user_id = cur.lastrowid
         conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        return jsonify(ok=False, error="Matric number already registered."), 400
     except Exception as e:
         conn.close()
-        return jsonify(ok=False, error=f"Could not create user (duplicate matric no?): {e}"), 400
+        return jsonify(ok=False, error=f"Could not create user: {e}"), 400
 
     representative_photo = None
-    for i, fb64 in enumerate(frames_b64):
-        bgr = decode_frame(fb64)
-        roi, bbox, detected = detect_face(bgr)
+    for i, roi in enumerate(face_rois):
         fname = save_capture(roi, f"user{user_id}_enrol{i}")
         if representative_photo is None:
             representative_photo = fname
