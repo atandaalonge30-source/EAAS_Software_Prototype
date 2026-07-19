@@ -225,7 +225,7 @@ def extract_emotion_features(gray_face):
         - vertical gradient bias (upward vs downward curvature, used to
           separate expressions such as smiling from frowning)
 
-    This 9-dimensional vector is passed to the MLP classifier below.
+    This 17-dimensional vector is passed to the MLP classifier below.
     """
     h, w = gray_face.shape
     brow = gray_face[int(h * 0.14):int(h * 0.30), :]
@@ -284,11 +284,22 @@ class EmotionClassifier:
         joblib.dump(self.model, self.model_path)
         joblib.dump(self.scaler, self.scaler_path)
 
+    def _validate_loaded_model(self):
+        if len(getattr(self.scaler, "mean_", [])) != EMOTION_FEATURE_DIM:
+            raise ValueError(
+                f"Loaded scaler expects {len(getattr(self.scaler, 'mean_', []))} features, "
+                f"but current pipeline produces {EMOTION_FEATURE_DIM}."
+            )
+
     def load(self):
         if os.path.exists(self.model_path) and os.path.exists(self.scaler_path):
-            self.model = joblib.load(self.model_path)
-            self.scaler = joblib.load(self.scaler_path)
-            self.trained = True
+            try:
+                self.model = joblib.load(self.model_path)
+                self.scaler = joblib.load(self.scaler_path)
+                self._validate_loaded_model()
+                self.trained = True
+            except Exception:
+                self.trained = False
 
     def predict(self, feature_vector):
         if not self.trained:
